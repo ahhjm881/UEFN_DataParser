@@ -75,7 +75,7 @@ class Parser:
     def get_wrapped_value(self, value):
         if(isinstance(value, int)):
             return value
-        if(isinstance(value, float)):
+        if(isinstance(value, float) ):
             return value
         if(isinstance(value, str)):
             return "\"{value}\"".format(value = value)

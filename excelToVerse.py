@@ -1,202 +1,323 @@
+# %% [markdown]
+# # excel 파일 로드
+
+# %%
 from openpyxl import load_workbook
-from stringcase import pascalcase, camelcase
-
-class Parser:
-    def __init__(self, load_ws, load_meta, sheetName):
-        self.load_ws = load_ws
-        self.load_meta = load_meta
-        self.dataList = []
-        
-        sheetName = sheetName[1:-1]
-        self.sheetName = str(sheetName)
-
-        self.parsePath = load_meta.cell(1, 2).value
-        self.closeConsole = load_meta.cell(2, 2).value
-        
-        self.all_values = []
-        self.field_names = []
-        self.field_types = []
-        self.item_field_dict = []
-        passFieldName = False
-        passFieldType = False
-        
-        dataList = self.dataList
-        all_values = self.all_values
-        field_names = self.field_names
-        field_types = self.field_types
-        item_field_dict = self.item_field_dict
-        
-        for row in load_ws.rows:
-            row_value = []
-            for cell in row:
-                row_value.append(cell.value)
-                
-            if(passFieldName and passFieldType):
-                all_values.append(row_value)
-            
-            if(passFieldName and not passFieldType):
-                passFieldType = True
-                field_types = row_value
-                
-            if(not passFieldName):
-                passFieldName = True
-                field_names = row_value
-        
-        for i in range(len(field_names)):
-            name = field_names[i]
-            type = field_types[i]
-            item_field_dict.append({"name":name, "type":type})
-        
-        self.fieldKey = item_field_dict[0]['name']
-        self.mapKey = item_field_dict[1]['name']
-        
-        for item in all_values:
-            item_dict = {}
-            
-            for i in range(len(field_names)):
-                field = field_names[i]
-                item_dict[field] = item[i]
-            dataList.append(item_dict)
-
-
-    def get_type_initValue(self, field_type):
-        if(field_type == "string"):
-            return "\"\""
-        if(field_type == "int"):
-            return "0"
-        if(field_type == "float"):
-            return "0.0"
-        if(field_type == "logic"):
-            return "false"  
-
-        print("get_type_initValue error")
-        return "ERROR!!!"   
-
-    def get_wrapped_value(self, value):
-        if(isinstance(value, int)):
-            return value
-        if(isinstance(value, float) ):
-            return value
-        if(isinstance(value, str)):
-            return "\"{value}\"".format(value = value)
-        if(isinstance(value, bool)):
-            return str(value).lower()
-
-        return value    
-    
-    def get_value_type(self, value):
-        if(isinstance(value, int)):
-            return "int"
-        if(isinstance(value, float)):
-            return "float"
-        if(isinstance(value, str)):
-            return "string"
-        if(isinstance(value, bool)):
-            raise Exception("logic(bool)은 키 값으로 사용할 수 없습니다.")
-        
-
-    def get_Item_template(self, fieldList):
-        template = """custom_{name}_item := class:
-""".format(name=self.sheetName)
-
-        fieldTemplate = "    var {name}<public>: {type} = {initValue}\n"
-
-        for field in fieldList:
-            if(field['name'] == self.fieldKey):
-                continue
-            if(field['name'] == self.mapKey):
-                continue
-            template += fieldTemplate.format(name=pascalcase(field['name']), type=field['type'], initValue = self.get_type_initValue(field['type']))  
-
-        return template 
-
-    def get_make_item_template(self, fieldList):
-        template = "make_custom_{name}_item<constructor>(".format(name=self.sheetName)
-
-        for i in range(len(fieldList)):
-            field = fieldList[i]
-            
-            if(field['name'] == self.fieldKey):
-                continue
-            if(field['name'] == self.mapKey):
-                continue
-            
-            template += "Arg{number}: {type}".format(number=i, type=field['type'])
-            if(i < len(fieldList) - 1):
-                template += ", "
-        template += ") := custom_{name}_item:\n".format(name=self.sheetName)
-
-        fieldTemplate = "    {name} := Arg{number}\n"   
-
-        for i in range(len(fieldList)):
-            field = fieldList[i]
-            
-            if(field['name'] == self.fieldKey):
-                continue
-            if(field['name'] == self.mapKey):
-                continue
-            
-            template += fieldTemplate.format(name=pascalcase(field['name']), number=i) 
-
-        return template 
-
-    def get_data_template(self, fieldKey, dataList):
-        template = """custom_{name}_data := class:
-""".format(name=self.sheetName)
-        mapTemplate = """    var Table<public>: [{keyType}]custom_{type}_item = map{{}}\n
-    TableCreate<public>():void=
-""".format(type = self.sheetName, keyType=self.item_field_dict[1]["type"])
-
-        for data in dataList:
-            print(data)
-            template += "    var {weapon}<public>:custom_{name}_item = ".format(weapon=pascalcase(data[fieldKey]), name=self.sheetName)
-            template += "custom_{name}_item{{}}\n".format(name=self.sheetName)
-            mapTemplate += "        if(set Table[{key}] = {item}) {{}}\n".format(key = self.get_wrapped_value(data[self.mapKey]), item = pascalcase(data[self.fieldKey]))
-
-        return template + "\n" + mapTemplate
-
-    def get_data_contstructor(self, fieldKey, dataList):
-        template = """make_custom_{name}_data<constructor>() := custom_{name}_data:
-""".format(name=self.sheetName)
-        for data in dataList:
-            template += "    {name} := make_custom_{classname}_item(".format(name=pascalcase(data[fieldKey]), classname=self.sheetName)
-
-            vs = [*data.values()]
-            for i in range(len(vs)):
-                if(i == 0 or i == 1):
-                    continue
-                
-                value = vs[i]
-                template += "{value}".format(value = self.get_wrapped_value(value))
-                if(i < len(vs)-1):
-                    template += ", "
-            template += ")\n"
-        return template
-    
-    def Parse(self):
-        parseItemTemplate = self.get_Item_template(self.item_field_dict)
-        parseItemConstructorTemplate = self.get_make_item_template(self.item_field_dict)
-        parseDataTemplate = self.get_data_template(self.fieldKey, self.dataList)
-        parseDataConstructorTemplate = self.get_data_contstructor(self.fieldKey, self.dataList)
-
-        print(parseItemTemplate)
-        print(parseItemConstructorTemplate)
-        print(parseDataTemplate)
-        print(parseDataConstructorTemplate)
-        s = ""
-        s += parseItemTemplate + "\n"
-        s += parseItemConstructorTemplate + "\n"
-        s += parseDataTemplate + "\n"
-        s += parseDataConstructorTemplate + "\n"
-        
-        return s
-        
-
-
+import re
 
 load_wb  = load_workbook("dataTable.xlsm", data_only = True)
 load_meta = load_wb["_meta_"]
 
+parsePath = load_meta.cell(1, 2).value
+closeConsole = load_meta.cell(2, 2).value
+
+# %%
+for sheetName in load_wb.sheetnames:
+    if(sheetName == "_meta_" or sheetName == "!!readme!!"):
+        continue
+    
+    print()
+    print(sheetName)
+    
+    sheet = load_wb[sheetName] 
+    for row in sheet.rows:
+        for cell in row:
+            print(cell.value, end=", ")
+        print()
+
+# %% [markdown]
+# # excel 파일의 데이터를 파싱
+
+# %%
+class FieldItem:
+    def __init__(self):
+        self.field_name = ""
+        self.type_name = ""
+        self.values = list()
+        self.row_values = dict()
+        
+    def __str__(self):
+        s = f"[field_name: {self.field_name}, type_name={self.type_name}, values: ""{"
+        
+        for value in self.values:
+            s += value + ", "
+        s += "}"
+            
+        return s
+    
+def create_fieldItems(sheet):
+    items = list()
+    genField = False
+    genType = False
+    
+    fieldCount = 0
+    
+    for row in sheet.rows:
+        for cell in row:
+            if(genField == False):
+                item = FieldItem()
+                item.field_name = str(cell.value)
+                items.append(item)
+            elif(genType == False):
+                item = items[fieldCount]
+                fieldCount += 1
+                item.type_name = str(cell.value)
+            else:
+                item = items[fieldCount]
+                if(fieldCount == 1):
+                    item.key = str(cell.value)
+                item.values.append(str(cell.value))
+                fieldCount += 1
+            
+                
+        if(genField == False):
+            genField = True
+        elif(genType == False):
+            genType = True
+        fieldCount = 0
+    
+    r_items = {}
+    
+    for item in items:
+        r_items[item.field_name] = item
+        
+    return r_items
+        
+
+test_field_items = create_fieldItems(load_wb["_weapon_"])
+print("keys: ")
+for item in test_field_items.keys():
+    print(item)
+print("\nvalues: ")
+for item in test_field_items.values():
+    print(item)
+            
+                
+            
+
+# %% [markdown]
+# ## 데이터 유효성 검사
+
+# %%
+def make_valid_int_value(value):
+    if(value.isdigit() == False):
+        return "!!!유효하지_않은_int값형식!!!"
+    
+    index = value.find('.')
+    
+    if(index != -1):    
+        return value[0:index - 1]
+    
+    return value
+
+
+
+# %%
+
+float_regex = re.compile("[0-9]")
+def make_valid_float_value(value):
+    if(value.count(".") > 1 or float_regex.match(value) == None):
+        return "!!!유효하지_않은_float값형식!!!"
+    
+    index = value.find('.')
+    
+    if(index == -1):    
+        value += ".0"
+    
+    return value
+
+
+
+# %%
+def make_valid_string_value(value):
+    if(value.count("\"") > 0):
+        return "!!!유효하지_않은_string값형식!!!"
+    
+    return f"\"{value}\""
+        
+
+
+
+# %%
+def make_valid_logic_value(value):
+    value = value.lower()
+    if(value == "true" or value == "false"):
+        return value
+    
+    return "!!!유효하지_않은_logic값형식!!!"
+
+# %%
+def make_valid_value(type, value):
+    predicate = {
+        "string": make_valid_string_value,
+        "logic": make_valid_logic_value,
+        "int": make_valid_int_value,
+        "float": make_valid_float_value,
+    }
+    
+    return predicate[type](value)
+
+# %%
+def make_default_value(type):
+    predicate = {
+        "string": "\"\"",
+        "logic": "false",
+        "int": "0",
+        "float": "0.0",
+    }
+    
+    return predicate[type]
+
+# %%
+print("==string==")
+print(make_valid_string_value("123"))
+print(make_valid_string_value("123.123321"))
+print(make_valid_string_value("123.00.0"))
+print(make_valid_string_value("ABCDE"))
+print(make_valid_string_value("AB123CDE123"))
+print(make_valid_string_value("A_=B123CDE12*3-"))
+print(make_valid_string_value("AB12.3CDE123"))
+print(make_valid_string_value("AB12.3CDE1.23"))
+
+print("==int==")
+print(make_valid_int_value("123"))
+print(make_valid_int_value("123.123321"))
+print(make_valid_int_value("123.00.0"))
+print(make_valid_int_value("ABCDE"))
+print(make_valid_int_value("AB123CDE123"))
+print(make_valid_int_value("A_=B123CDE12*3-"))
+print(make_valid_int_value("AB12.3CDE123"))
+print(make_valid_int_value("AB12.3CDE1.23"))
+
+print("==float==")
+print(make_valid_float_value("123"))
+print(make_valid_float_value("123.123321"))
+print(make_valid_float_value("123.00.0"))
+print(make_valid_float_value("ABCDE"))
+print(make_valid_float_value("AB123CDE123"))
+print(make_valid_float_value("A_=B123CDE12*3-"))
+print(make_valid_float_value("AB12.3CDE123"))
+print(make_valid_float_value("AB12.3CDE1.23"))
+
+print("==logic==")
+print(make_valid_logic_value("123"))
+print(make_valid_logic_value("123.123321"))
+print(make_valid_logic_value("123.00.0"))
+print(make_valid_logic_value("ABCDE"))
+print(make_valid_logic_value("AB123CDE123"))
+print(make_valid_logic_value("A_=B123CDE12*3-"))
+print(make_valid_logic_value("AB12.3CDE123"))
+print(make_valid_logic_value("AB12.3CDE1.23"))
+print(make_valid_logic_value("true"))
+print(make_valid_logic_value("false"))
+print(make_valid_logic_value("True"))
+print(make_valid_logic_value("False"))
+print(make_valid_logic_value("TRUE"))
+print(make_valid_logic_value("FALSE"))
+
+# %% [markdown]
+# # verse 코드로 파싱
+
+# %%
+class SheetItem:
+    def __init__(self, sheet, sheet_name):
+        self.sheet = sheet
+        self.sheet_name = sheet_name[1:len(sheet_name)-1]
+        
+        self.field_items = create_fieldItems(sheet)
+        
+
+# %%
+def get_item_template(sheet_item):
+    template = f"generated_{sheet_item.sheet_name} := class<unique>():\n"
+    indent = "    "
+    
+    field_template = indent + "var {field_name}<public>: {type_name} = {default_value}\n"
+    
+    for item in sheet_item.field_items.values():
+        template += field_template.format(
+            field_name = item.field_name,
+            type_name = item.type_name,
+            default_value = make_default_value(item.type_name)
+        )
+    
+    return template
+
+# %%
+def get_constructor_item_template(sheet_item):
+    template = f"generated_{sheet_item.sheet_name}_constructor<constructor>("
+    indent = "    "
+    count = 0
+    
+    arg_template = "Arg{number}: {type_name}"
+    field_template = "{field_name} := Arg{number}"
+    
+    for item in sheet_item.field_items.values():
+        template += arg_template.format(
+            number = count,
+            type_name = item.type_name
+        )
+        
+        count += 1
+        if(len(sheet_item.field_items.values()) != count):
+            template += ", "
+        else:
+            template += f") := generated_{sheet_item.sheet_name}:\n"
+    
+    count = 0
+    for item in sheet_item.field_items.values():
+        template += indent + field_template.format(
+            field_name = item.field_name,
+            number = count
+        ) + "\n"
+        
+        count += 1
+    
+    return template
+
+# %%
+def get_item_set_template(sheet_item):
+    indent = "    "
+    count = 0
+    template = f"generated_{sheet_item.sheet_name}_set := class<unique>():\n{indent}var Table<public>: [string]generated_{sheet_item.sheet_name} = map{{}}\n\n{indent}Initialize<public>():void=\n{indent}{indent}var Temp: generated_{sheet_item.sheet_name} = generated_{sheet_item.sheet_name}{{}}\n"
+    
+    item_template = "{indent}set Temp = {constructor_template}\n{indent}{indent}if(set Table[\"{field_name}\"] = Temp) {{}}"
+    list_item = list(sheet_item.field_items.values())
+    
+    for index in range(0, len(list_item[0].values)):
+        constructor_template = f"generated_{sheet_item.sheet_name}_constructor("
+        key = ""
+        for item in sheet_item.field_items.values():
+            constructor_template += make_valid_value(item.type_name, item.values[index])
+            if(count == 1):
+                key = item.values[index]
+            count += 1
+            if(len(sheet_item.field_items.values()) != count):
+                constructor_template += ", "
+            else:
+                constructor_template += ")"
+        count = 0
+
+        template += indent + item_template.format(
+            field_name = key,
+            sheet_name = sheet_item.sheet_name,
+            constructor_template = constructor_template,
+            class_name = f"generated_{sheet_item.sheet_name}",
+            indent = indent
+        ) + "\n"
+    
+    return template
+
+# %%
+test_sheet_item = SheetItem(load_wb["_weapon_"], "_weapon_")
+print(get_item_template(test_sheet_item))
+print(get_constructor_item_template(test_sheet_item))
+print(get_item_set_template(test_sheet_item))
+
+# %% [markdown]
+# # 출력파일 생성
+
+# %%
 parsePath = load_meta.cell(1, 2).value
 closeConsole = load_meta.cell(2, 2).value
 
@@ -221,9 +342,11 @@ for sheet in load_wb.sheetnames:
     try:
         print("-----------try to parse {name}-----------".format(name=sheet))
         print()
-        p = Parser(load_ws, load_meta, sheet)
+        p = SheetItem(load_ws, sheet)
         s += "\n#=============================================={name}==============================================\n".format(name = sheet)
-        s += p.Parse()
+        s += get_item_template(p) + "\n"
+        s += get_constructor_item_template(p) + "\n"
+        s += get_item_set_template(p) + "\n"
         s += "\n#==============================================\n#==============================================\n\n"
     except Exception as e:
         print(sheet + " sheet parse faield")
@@ -237,3 +360,5 @@ except:
         
 if(not closeConsole):
     input("exit ?")
+
+

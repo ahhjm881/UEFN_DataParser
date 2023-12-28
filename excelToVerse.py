@@ -229,7 +229,7 @@ class SheetItem:
 
 # %%
 def get_item_template(sheet_item):
-    template = f"generated_{sheet_item.sheet_name} := class<unique>():\n"
+    template = f"generated_{sheet_item.sheet_name}<public> := class<unique>():\n"
     indent = "    "
     
     field_template = indent + "var {field_name}<public>: {type_name} = {default_value}\n"
@@ -279,7 +279,7 @@ def get_constructor_item_template(sheet_item):
 def get_item_set_template(sheet_item):
     indent = "    "
     count = 0
-    template = f"generated_{sheet_item.sheet_name}_set := class<unique>():\n{indent}var Table<public>: [string]generated_{sheet_item.sheet_name} = map{{}}\n\n{indent}Initialize<public>():void=\n{indent}{indent}var Temp: generated_{sheet_item.sheet_name} = generated_{sheet_item.sheet_name}{{}}\n"
+    template = f"generated_{sheet_item.sheet_name}_set<public> := class<unique>():\n{indent}var Table<public>: [string]generated_{sheet_item.sheet_name} = map{{}}\n\n{indent}Initialize<public>():void=\n{indent}{indent}var Temp: generated_{sheet_item.sheet_name} = generated_{sheet_item.sheet_name}{{}}\n"
     
     item_template = "{indent}set Temp = {constructor_template}\n{indent}{indent}if(set Table[\"{field_name}\"] = Temp) {{}}"
     list_item = list(sheet_item.field_items.values())

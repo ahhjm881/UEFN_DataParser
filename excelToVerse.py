@@ -84,13 +84,13 @@ def create_fieldItems(sheet):
     return r_items
         
 
-test_field_items = create_fieldItems(load_wb["_weapon_"])
-print("keys: ")
-for item in test_field_items.keys():
-    print(item)
-print("\nvalues: ")
-for item in test_field_items.values():
-    print(item)
+#test_field_items = create_fieldItems(load_wb["_weapon_"])
+#print("keys: ")
+#for item in test_field_items.keys():
+#    print(item)
+#print("\nvalues: ")
+#for item in test_field_items.values():
+#    print(item)
             
                 
             
@@ -309,10 +309,65 @@ def get_item_set_template(sheet_item):
     return template
 
 # %%
-test_sheet_item = SheetItem(load_wb["_weapon_"], "_weapon_")
-print(get_item_template(test_sheet_item))
-print(get_constructor_item_template(test_sheet_item))
-print(get_item_set_template(test_sheet_item))
+def get_item_data_manager_function(sheet_item_list):
+    template = ""
+    template += "data_manager := class(base_data_manager):\n"
+    template += "{fields}\n"
+    template += "    Initialize<override>():void=\n"
+    template += "{inits}\n"
+    template += "{getters}\n"
+
+
+    
+    member_indent = "    "
+    field_indent = "        "
+    
+    fields_output_template = ""
+    getters_output_template = ""
+    inits_output_template = ""
+    
+    fields_template = "{member_indent}var {sheet_name}<protected>: generated_{sheet_name}_set = generated_{sheet_name}_set{{}}\n"
+    getters_template = "{member_indent}Get_{sheet_name}<public>(): generated_{sheet_name}_set=\n{field_indent}return {sheet_name}\n"
+    getters_failure_template = "{member_indent}Get_F{sheet_name}<public>()<decides><transacts>: generated_{sheet_name}_set=\n{field_indent}return {sheet_name}\n"
+    inits_template = "{field_indent}{sheet_name}.Initialize()\n"
+
+
+    for sheet_item in sheet_item_list:
+        fields_output_template += fields_template.format(
+            member_indent = member_indent,
+            sheet_name = sheet_item.sheet_name
+        )
+        
+    for sheet_item in sheet_item_list:
+        getters_output_template += getters_template.format(
+            field_indent= field_indent,
+            sheet_name = sheet_item.sheet_name,
+            member_indent = member_indent
+        ) + getters_failure_template.format(
+            field_indent= field_indent,
+            sheet_name = sheet_item.sheet_name,
+            member_indent = member_indent
+        )
+        
+    for sheet_item in sheet_item_list:
+        inits_output_template += inits_template.format(
+            sheet_name = sheet_item.sheet_name,
+            field_indent= field_indent
+        )
+        
+    return template.format(
+        fields = fields_output_template,
+        getters = getters_output_template,
+        inits = inits_output_template
+    )
+
+# %%
+#test_sheet_item = SheetItem(load_wb["_weapon_"], "_weapon_")
+#print(get_item_template(test_sheet_item))
+#print(get_constructor_item_template(test_sheet_item))
+#print(get_item_set_template(test_sheet_item))
+#print(get_item_injection_interface(test_sheet_item))
+#print(get_item_data_manager_function([SheetItem(load_wb["_weapon_"], "_weapon_"), SheetItem(load_wb["_object_"], "_object_")]))
 
 # %% [markdown]
 # # 출력파일 생성
@@ -323,6 +378,7 @@ closeConsole = load_meta.cell(2, 2).value
 
 s = ""
 
+sheet_item_list = []
 for sheet in load_wb.sheetnames:
     load_ws = None
     
@@ -343,15 +399,23 @@ for sheet in load_wb.sheetnames:
         print("-----------try to parse {name}-----------".format(name=sheet))
         print()
         p = SheetItem(load_ws, sheet)
+        sheet_item_list.append(p)
         s += "\n#=============================================={name}==============================================\n".format(name = sheet)
         s += get_item_template(p) + "\n"
         s += get_constructor_item_template(p) + "\n"
         s += get_item_set_template(p) + "\n"
+        s += get_item_injection_interface(p) + "\n"
         s += "\n#==============================================\n#==============================================\n\n"
     except Exception as e:
         print(sheet + " sheet parse faield")
         print(e)
         
+try:
+    s += "\n#=============================================={{generated data_manager}}==============================================\n".format(name = sheet)
+    s += get_item_data_manager_function(sheet_item_list)
+except Exception as e:
+        print(sheet + " sheet parse faield")
+        print(e)
 try:
     with open(parsePath+"\data.verse", 'w') as writer:
        writer.write(s + "\n")

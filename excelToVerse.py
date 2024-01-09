@@ -404,7 +404,6 @@ for sheet in load_wb.sheetnames:
         s += get_item_template(p) + "\n"
         s += get_constructor_item_template(p) + "\n"
         s += get_item_set_template(p) + "\n"
-        s += get_item_injection_interface(p) + "\n"
         s += "\n#==============================================\n#==============================================\n\n"
     except Exception as e:
         print(sheet + " sheet parse faield")

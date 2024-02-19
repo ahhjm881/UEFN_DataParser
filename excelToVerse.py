@@ -3,6 +3,7 @@
 
 # %%
 from openpyxl import load_workbook
+import traceback
 import re
 
 load_wb  = load_workbook("dataTable.xlsm", data_only = True)
@@ -169,51 +170,51 @@ def make_default_value(type):
     return predicate[type]
 
 # %%
-print("==string==")
-print(make_valid_string_value("123"))
-print(make_valid_string_value("123.123321"))
-print(make_valid_string_value("123.00.0"))
-print(make_valid_string_value("ABCDE"))
-print(make_valid_string_value("AB123CDE123"))
-print(make_valid_string_value("A_=B123CDE12*3-"))
-print(make_valid_string_value("AB12.3CDE123"))
-print(make_valid_string_value("AB12.3CDE1.23"))
-
-print("==int==")
-print(make_valid_int_value("123"))
-print(make_valid_int_value("123.123321"))
-print(make_valid_int_value("123.00.0"))
-print(make_valid_int_value("ABCDE"))
-print(make_valid_int_value("AB123CDE123"))
-print(make_valid_int_value("A_=B123CDE12*3-"))
-print(make_valid_int_value("AB12.3CDE123"))
-print(make_valid_int_value("AB12.3CDE1.23"))
-
-print("==float==")
-print(make_valid_float_value("123"))
-print(make_valid_float_value("123.123321"))
-print(make_valid_float_value("123.00.0"))
-print(make_valid_float_value("ABCDE"))
-print(make_valid_float_value("AB123CDE123"))
-print(make_valid_float_value("A_=B123CDE12*3-"))
-print(make_valid_float_value("AB12.3CDE123"))
-print(make_valid_float_value("AB12.3CDE1.23"))
-
-print("==logic==")
-print(make_valid_logic_value("123"))
-print(make_valid_logic_value("123.123321"))
-print(make_valid_logic_value("123.00.0"))
-print(make_valid_logic_value("ABCDE"))
-print(make_valid_logic_value("AB123CDE123"))
-print(make_valid_logic_value("A_=B123CDE12*3-"))
-print(make_valid_logic_value("AB12.3CDE123"))
-print(make_valid_logic_value("AB12.3CDE1.23"))
-print(make_valid_logic_value("true"))
-print(make_valid_logic_value("false"))
-print(make_valid_logic_value("True"))
-print(make_valid_logic_value("False"))
-print(make_valid_logic_value("TRUE"))
-print(make_valid_logic_value("FALSE"))
+#print("==string==")
+#print(make_valid_string_value("123"))
+#print(make_valid_string_value("123.123321"))
+#print(make_valid_string_value("123.00.0"))
+#print(make_valid_string_value("ABCDE"))
+#print(make_valid_string_value("AB123CDE123"))
+#print(make_valid_string_value("A_=B123CDE12*3-"))
+#print(make_valid_string_value("AB12.3CDE123"))
+#print(make_valid_string_value("AB12.3CDE1.23"))
+#
+#print("==int==")
+#print(make_valid_int_value("123"))
+#print(make_valid_int_value("123.123321"))
+#print(make_valid_int_value("123.00.0"))
+#print(make_valid_int_value("ABCDE"))
+#print(make_valid_int_value("AB123CDE123"))
+#print(make_valid_int_value("A_=B123CDE12*3-"))
+#print(make_valid_int_value("AB12.3CDE123"))
+#print(make_valid_int_value("AB12.3CDE1.23"))
+#
+#print("==float==")
+#print(make_valid_float_value("123"))
+#print(make_valid_float_value("123.123321"))
+#print(make_valid_float_value("123.00.0"))
+#print(make_valid_float_value("ABCDE"))
+#print(make_valid_float_value("AB123CDE123"))
+#print(make_valid_float_value("A_=B123CDE12*3-"))
+#print(make_valid_float_value("AB12.3CDE123"))
+#print(make_valid_float_value("AB12.3CDE1.23"))
+#
+#print("==logic==")
+#print(make_valid_logic_value("123"))
+#print(make_valid_logic_value("123.123321"))
+#print(make_valid_logic_value("123.00.0"))
+#print(make_valid_logic_value("ABCDE"))
+#print(make_valid_logic_value("AB123CDE123"))
+#print(make_valid_logic_value("A_=B123CDE12*3-"))
+#print(make_valid_logic_value("AB12.3CDE123"))
+#print(make_valid_logic_value("AB12.3CDE1.23"))
+#print(make_valid_logic_value("true"))
+#print(make_valid_logic_value("false"))
+#print(make_valid_logic_value("True"))
+#print(make_valid_logic_value("False"))
+#print(make_valid_logic_value("TRUE"))
+#print(make_valid_logic_value("FALSE"))
 
 # %% [markdown]
 # # verse 코드로 파싱
@@ -397,7 +398,6 @@ for sheet in load_wb.sheetnames:
     
     try:
         print("-----------try to parse {name}-----------".format(name=sheet))
-        print()
         p = SheetItem(load_ws, sheet)
         sheet_item_list.append(p)
         s += "\n#=============================================={name}==============================================\n".format(name = sheet)
@@ -405,9 +405,10 @@ for sheet in load_wb.sheetnames:
         s += get_constructor_item_template(p) + "\n"
         s += get_item_set_template(p) + "\n"
         s += "\n#==============================================\n#==============================================\n\n"
+        print("success")
     except Exception as e:
-        print(sheet + " sheet parse faield")
-        print(e)
+        print(sheet + " sheet parse failed\n")
+        print(traceback.format_exc())
         
 try:
     s += "\n#=============================================={{generated data_manager}}==============================================\n".format(name = sheet)
